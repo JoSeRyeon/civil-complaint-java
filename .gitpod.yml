@@ -1,0 +1,52 @@
+image:
+  file: .gitpod.Dockerfile
+
+ports:
+  - port: 8080
+    onOpen: open-preview
+  - port: 5432
+    visibility: private
+
+tasks:
+  - name: init-and-run
+    init: |
+      echo ">>> Spring Boot 프로젝트와 PostgreSQL 컨테이너 준비 중..."
+
+      # Postgres 컨테이너(pg) 없으면 새로 생성, 있으면 재시작
+      if [ ! "$(docker ps -q -f name=pg)" ]; then
+        if [ "$(docker ps -aq -f status=exited -f name=pg)" ]; then
+          echo ">>> 기존 postgres 컨테이너 시작"
+          docker start pg
+        else
+          echo ">>> 새 postgres 컨테이너 생성"
+          docker run --name pg \
+            -e POSTGRES_PASSWORD=1234 \
+            -e POSTGRES_DB=civil_complaint \
+            -p 5432:5432 \
+            -d postgres:16
+        fi
+      fi
+
+      # app 디렉토리가 없으면 Spring Initializr로 프로젝트 생성
+      if [ ! -d app ]; then
+        echo ">>> Spring Boot 프로젝트 생성 (civil-complaint)"
+        curl https://start.spring.io/starter.zip \
+          -d dependencies=web,thymeleaf,lombok,mybatis,postgresql,validation,devtools \
+          -d type=maven-project \
+          -d language=java \
+          -d bootVersion=3.3.4 \
+          -d groupId=com.example \
+          -d artifactId=civil-complaint \
+          -d name=civil-complaint \
+          -d packageName=com.example.civilcomplaint \
+          -d javaVersion=17 \
+          -o project.zip
+
+        unzip project.zip -d app
+        rm project.zip
+      fi
+
+    command: |
+      cd app
+      echo ">>> Maven 의존성 다운로드 및 애플리케이션 실행"
+      mvn spring-boot:run
